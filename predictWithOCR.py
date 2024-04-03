@@ -1,7 +1,8 @@
-import csv
+import hydra
 import torch
 import easyocr
 import cv2
+import csv  # Added library for CSV operations
 from ultralytics.yolo.engine.predictor import BasePredictor
 from ultralytics.yolo.utils import DEFAULT_CONFIG, ROOT, ops
 from ultralytics.yolo.utils.checks import check_imgsz
@@ -27,11 +28,6 @@ def getOCR(im, coors):
     return str(ocr)
 
 class DetectionPredictor(BasePredictor):
-
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.csv_file = str(self.save_dir / 'detected_numberplates.csv')
-        self.csv_header_written = False
 
     def get_annotator(self, img):
         return Annotator(img, line_width=self.args.line_thickness, example=str(self.model.names))
@@ -81,6 +77,16 @@ class DetectionPredictor(BasePredictor):
             n = (det[:, 5] == c).sum()  # detections per class
             log_string += f"{n} {self.model.names[int(c)]}{'s' * (n > 1)}, "
         
+        # Write to CSV file
+        with open('extracted_data.csv', 'a', newline='') as csvfile:
+            fieldnames = ['Number Plate', 'Extracted Text']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            for *xyxy, conf, cls in reversed(det):
+                ocr = getOCR(im0, xyxy)
+                if ocr != "":
+                    writer.writerow({'Number Plate': self.model.names[int(cls)], 'Extracted Text': ocr})
+
         for *xyxy, conf, cls in reversed(det):
             if self.args.save_txt:  # Write to file
                 xywh = (ops.xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
@@ -95,4 +101,16 @@ class DetectionPredictor(BasePredictor):
                 ocr = getOCR(im0, xyxy)
                 if ocr != "":
                     label = ocr
-                self.annotator
+                self.annotator.box_label(xyxy, label, color=colors(c, True))
+                if self.args.save_crop:
+                    imc = im0.copy()
+                    save_one_box(xyxy,
+                                 imc,
+                                 file=self.save_dir / 'crops' / self.model.model.names[c] / f'{self.data_path.stem}.jpg',
+                                 BGR=True)
+
+        return log_string
+
+@hydra.main(version_base=None, config_path=str(DEFAULT_CONFIG.parent), config_name=DEFAULT_CONFIG.name)
+def predict(cfg):
+    cfg.model = cfg.model
