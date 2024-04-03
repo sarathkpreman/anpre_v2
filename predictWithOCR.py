@@ -1,5 +1,4 @@
-# Ultralytics YOLO 🚀, GPL-3.0 license
-
+import csv
 import hydra
 import torch
 import easyocr
@@ -10,23 +9,28 @@ from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.plotting import Annotator, colors, save_one_box
 
 def getOCR(im, coors):
-    x,y,w, h = int(coors[0]), int(coors[1]), int(coors[2]),int(coors[3])
-    im = im[y:h,x:w]
+    x, y, w, h = int(coors[0]), int(coors[1]), int(coors[2]), int(coors[3])
+    im = im[y:h, x:w]
     conf = 0.2
 
-    gray = cv2.cvtColor(im , cv2.COLOR_RGB2GRAY)
+    gray = cv2.cvtColor(im, cv2.COLOR_RGB2GRAY)
     results = reader.readtext(gray)
     ocr = ""
 
     for result in results:
         if len(results) == 1:
             ocr = result[1]
-        if len(results) >1 and len(results[1])>6 and results[2]> conf:
+        if len(results) > 1 and len(results[1]) > 6 and results[2] > conf:
             ocr = result[1]
     
     return str(ocr)
 
 class DetectionPredictor(BasePredictor):
+
+    def __init__(self, cfg):
+        super().__init__(cfg)
+        self.csv_file = str(self.save_dir / 'detected_numberplates.csv')
+        self.csv_header_written = False
 
     def get_annotator(self, img):
         return Annotator(img, line_width=self.args.line_thickness, example=str(self.model.names))
@@ -64,7 +68,6 @@ class DetectionPredictor(BasePredictor):
             frame = getattr(self.dataset, 'frame', 0)
 
         self.data_path = p
-        # save_path = str(self.save_dir / p.name)  # im.jpg
         self.txt_path = str(self.save_dir / 'labels' / p.stem) + ('' if self.dataset.mode == 'image' else f'_{frame}')
         log_string += '%gx%g ' % im.shape[2:]  # print string
         self.annotator = self.get_annotator(im0)
@@ -76,8 +79,7 @@ class DetectionPredictor(BasePredictor):
         for c in det[:, 5].unique():
             n = (det[:, 5] == c).sum()  # detections per class
             log_string += f"{n} {self.model.names[int(c)]}{'s' * (n > 1)}, "
-        # write
-        gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+        
         for *xyxy, conf, cls in reversed(det):
             if self.args.save_txt:  # Write to file
                 xywh = (ops.xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
@@ -89,10 +91,11 @@ class DetectionPredictor(BasePredictor):
                 c = int(cls)  # integer class
                 label = None if self.args.hide_labels else (
                     self.model.names[c] if self.args.hide_conf else f'{self.model.names[c]} {conf:.2f}')
-                ocr = getOCR(im0,xyxy)
+                ocr = getOCR(im0, xyxy)
                 if ocr != "":
                     label = ocr
                 self.annotator.box_label(xyxy, label, color=colors(c, True))
+                self.write_to_csv([self.model.names[int(cls)], ocr])  # Write to CSV
             if self.args.save_crop:
                 imc = im0.copy()
                 save_one_box(xyxy,
@@ -102,16 +105,5 @@ class DetectionPredictor(BasePredictor):
 
         return log_string
 
-
-@hydra.main(version_base=None, config_path=str(DEFAULT_CONFIG.parent), config_name=DEFAULT_CONFIG.name)
-def predict(cfg):
-    cfg.model = cfg.model or "yolov8n.pt"
-    cfg.imgsz = check_imgsz(cfg.imgsz, min_dim=2)  # check image size
-    cfg.source = cfg.source if cfg.source is not None else ROOT / "assets"
-    predictor = DetectionPredictor(cfg)
-    predictor()
-
-
-if __name__ == "__main__":
-    reader = easyocr.Reader(['en'])
-    predict()
+    def write_to_csv(self, vehicle_details):
+        if not self.csv
