@@ -106,4 +106,4 @@ class DetectionPredictor(BasePredictor):
         return log_string
 
     def write_to_csv(self, vehicle_details):
-        if not self.csv
+        if not self.csv:
