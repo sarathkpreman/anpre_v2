@@ -1,5 +1,4 @@
 import csv
-import hydra
 import torch
 import easyocr
 import cv2
@@ -7,6 +6,8 @@ from ultralytics.yolo.engine.predictor import BasePredictor
 from ultralytics.yolo.utils import DEFAULT_CONFIG, ROOT, ops
 from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.plotting import Annotator, colors, save_one_box
+
+reader = easyocr.Reader(['en'])
 
 def getOCR(im, coors):
     x, y, w, h = int(coors[0]), int(coors[1]), int(coors[2]), int(coors[3])
@@ -96,11 +97,14 @@ class DetectionPredictor(BasePredictor):
                     label = ocr
                 self.annotator.box_label(xyxy, label, color=colors(c, True))
                 self.write_to_csv([self.model.names[int(cls)], ocr])  # Write to CSV
-           if self.args.save_crop:
-                imc = im0.copy()
-                save_one_box(xyxy,
-                             imc,
-                             file=self.save_dir / 'crops' / self.model.model.names[c] / f'{self.data_path.stem}.jpg',
-                             BGR=True)  # Assuming BGR is a boolean value
+                if self.args.save_crop:
+                    imc = im0.copy()
+                    save_one_box(xyxy,
+                                 imc,
+                                 file=self.save_dir / 'crops' / self.model.names[c] / f'{self.data_path.stem}.jpg',
+                                 BGR=True)
 
-
+# Example usage:
+config = DEFAULT_CONFIG
+predictor = DetectionPredictor(config)
+predictor.run()
