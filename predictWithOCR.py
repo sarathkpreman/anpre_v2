@@ -96,9 +96,10 @@ class DetectionPredictor(BasePredictor):
                     label = ocr
                 self.annotator.box_label(xyxy, label, color=colors(c, True))
                 self.write_to_csv([self.model.names[int(cls)], ocr])  # Write to CSV
-            if self.args.save_crop:
-                imc = im0.copy()
-                save_one_box(xyxy,
-                             imc,
-                             file=self.save_dir / 'crops' / self.model.model.names[c] / f'{self.data_path.stem}.jpg',
-                             BGR
+           if self.args.save_crop:
+    imc = im0.copy()
+    save_one_box(xyxy,
+                 imc,
+                 file=self.save_dir / 'crops' / self.model.model.names[c] / f'{self.data_path.stem}.jpg',
+                 BGR=True)  # Assuming BGR is a boolean value
+
