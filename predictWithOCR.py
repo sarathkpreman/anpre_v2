@@ -101,9 +101,4 @@ class DetectionPredictor(BasePredictor):
                 save_one_box(xyxy,
                              imc,
                              file=self.save_dir / 'crops' / self.model.model.names[c] / f'{self.data_path.stem}.jpg',
-                             BGR=True)
-
-        return log_string
-
-    def write_to_csv(self, vehicle_details):
-        if not self.csv:
+                             BGR
