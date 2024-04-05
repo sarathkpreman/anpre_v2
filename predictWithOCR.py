@@ -10,22 +10,30 @@ from ultralytics.yolo.utils.plotting import Annotator, colors, save_one_box
 
 reader = easyocr.Reader(['en'])
 
-def getOCR(im, coors):
+def getOCR(im, coors, csv_file):
+    # Extract coordinates of the bounding box
     x, y, w, h = int(coors[0]), int(coors[1]), int(coors[2]), int(coors[3])
-    im = im[y:h, x:w]
-    conf = 0.2
-
-    gray = cv2.cvtColor(im, cv2.COLOR_RGB2GRAY)
-    results = reader.readtext(gray)
-    ocr = ""
-
-    for result in results:
-        if len(results) == 1:
-            ocr = result[1]
-        if len(results) > 1 and len(results[1]) > 6 and results[2] > conf:
-            ocr = result[1]
+    # Crop the image to the bounding box region
+    plate_roi = im[y:h, x:w]
     
-    return str(ocr)
+    # Convert the cropped image to grayscale
+    gray_plate = cv2.cvtColor(plate_roi, cv2.COLOR_RGB2GRAY)
+    
+    # Perform OCR on the grayscale image
+    results = reader.readtext(gray_plate)
+    
+    # Extract text from OCR results
+    text = ""
+    for result in results:
+        text += result[1] + " "
+    
+    # Write text to CSV file
+    with open(csv_file, 'w', newline='', encoding='utf-8') as csvfile:
+        csv_writer = csv.writer(csvfile)
+        csv_writer.writerow(['Number Plate Details'])
+        csv_writer.writerow([text])
+    
+    return csv_file
 
 class DetectionPredictor(BasePredictor):
 
